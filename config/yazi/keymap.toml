@@ -1,0 +1,107 @@
+# Paste into hovered folder
+[[mgr.prepend_keymap]]
+on   = "p"
+run  = "plugin smart-paste"
+desc = "Paste into the hovered directory or CWD"
+
+# open file or dir on l
+[[mgr.prepend_keymap]]
+on   = "l"
+run  = "plugin smart-enter"
+desc = "Enter the child directory, or open the file"
+
+# scroll column left
+[[mgr.prepend_keymap]]
+on = "H"
+run = "plugin duckdb -1"
+desc = "Scroll one column to the left"
+
+# scroll column right
+[[mgr.prepend_keymap]]
+on = "L"
+run = "plugin duckdb +1"
+desc = "Scroll one column to the right"
+
+# open duckdb cli
+[[mgr.prepend_keymap]]
+on = ["g", "o"]             
+run = "plugin duckdb -open" 
+desc = "open with duckdb"   
+
+# Open Duckdb ui
+[[mgr.prepend_keymap]]
+on = ["g", "u"]             
+run = "plugin duckdb -ui"   
+desc = "open with duckdb ui"
+
+# find
+[[mgr.prepend_keymap]]
+on   = "f"
+run  = "plugin jump-to-char"
+desc = "Jump to char"
+
+# chmod
+[[mgr.prepend_keymap]]
+on   = [ "c", "m" ]
+run  = "plugin chmod"
+desc = "Chmod on selected files"
+
+# sudo cp/mv
+[[mgr.prepend_keymap]]
+on = ["R", "p", "p"]
+run = "plugin sudo -- paste"
+desc = "sudo paste"
+
+# sudo cp/mv --force
+[[mgr.prepend_keymap]]
+on = ["R", "P"]
+run = "plugin sudo -- paste --force"
+desc = "sudo paste"
+
+# sudo mv
+[[mgr.prepend_keymap]]
+on = ["R", "r"]
+run = "plugin sudo -- rename"
+desc = "sudo rename"
+
+# sudo ln -s (absolute-path)
+[[mgr.prepend_keymap]]
+on = ["R", "p", "l"]
+run = "plugin sudo -- link"
+desc = "sudo link"
+
+# sudo ln -s (relative-path)
+[[mgr.prepend_keymap]]
+on = ["R", "p", "r"]
+run = "plugin sudo -- link --relative"
+desc = "sudo link relative path"
+
+# sudo ln
+[[mgr.prepend_keymap]]
+on = ["R", "p", "L"]
+run = "plugin sudo -- hardlink"
+desc = "sudo hardlink"
+
+# sudo touch/mkdir
+[[mgr.prepend_keymap]]
+on = ["R", "a"]
+run = "plugin sudo -- create"
+desc = "sudo create"
+
+# sudo trash
+[[mgr.prepend_keymap]]
+on = ["R", "d"]
+run = "plugin sudo -- remove"
+desc = "sudo trash"
+
+# sudo delete
+[[mgr.prepend_keymap]]
+on = ["R", "D"]
+run = "plugin sudo -- remove --permanently"
+desc = "sudo delete"
+
+# lazygit
+[[mgr.prepend_keymap]]
+on   = [ "g", "i" ]
+run  = "plugin lazygit"
+desc = "run lazygit"

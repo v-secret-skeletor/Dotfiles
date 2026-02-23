@@ -1,0 +1,10 @@
+alias zshconfig="$EDITOR ~/.zshrc"
+alias zshreload=". ~/.zshrc"
+alias vim=$(which nvim)
+alias python="python3"
+alias pip="pip3"
+alias cd="z"
+alias ,m="y"
+alias ls="y"
+alias n="nvim ."
+alias pr="gh pr create --fill"

@@ -1,0 +1,5 @@
+[user]
+	name = Walden Bodtker
+	email = v-secret-skeletor@github.com
+[core]
+	editor = nvim
