@@ -173,7 +173,23 @@ install_ruby() {
 install_ruby
 
 # ---------------------------------------------------------------------------
-# 8. Symlink / copy configs
+# 8. Node.js & npm (needed for TypeScript / JavaScript LSPs)
+# ---------------------------------------------------------------------------
+install_node() {
+  if command -v npm &>/dev/null; then
+    log "npm $(npm --version) already installed, skipping."
+    return
+  fi
+
+  log "Installing Node.js LTS via NodeSource..."
+  curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
+  sudo apt-get install -y -qq nodejs
+  log "Node.js $(node --version), npm $(npm --version) installed."
+}
+install_node
+
+# ---------------------------------------------------------------------------
+# 9. Symlink / copy configs
 # ---------------------------------------------------------------------------
 log "Linking configuration files..."
 
@@ -217,14 +233,14 @@ cp -r "$DOTFILES_DIR/copilot/." "$HOME/.copilot/"
 log "  copilot → ~/.copilot"
 
 # ---------------------------------------------------------------------------
-# 9. vim-plug plugin install (headless)
+# 10. vim-plug plugin install (headless)
 # ---------------------------------------------------------------------------
 log "Installing neovim plugins via vim-plug (headless)..."
 nvim --headless +PlugInstall +qall 2>/dev/null || warn "PlugInstall had warnings — plugins may need manual review."
 log "Neovim plugins installed."
 
 # ---------------------------------------------------------------------------
-# 10. yazi plugin install
+# 11. yazi plugin install
 # ---------------------------------------------------------------------------
 log "Installing yazi plugins..."
 if command -v ya &>/dev/null; then
@@ -235,7 +251,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 11. Set default shell to zsh
+# 12. Set default shell to zsh
 # ---------------------------------------------------------------------------
 if [ "$SHELL" != "$(which zsh)" ]; then
   log "Setting default shell to zsh..."
