@@ -102,7 +102,7 @@ install_yazi() {
     source "$HOME/.cargo/env"
   fi
 
-  cargo install --locked yazi-fm yazi-cli
+  cargo install --force yazi-build
 
   # Place binaries on the system PATH so they're available without cargo env
   sudo install "$HOME/.cargo/bin/yazi" /usr/local/bin/yazi
