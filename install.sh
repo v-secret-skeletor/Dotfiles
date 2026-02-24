@@ -92,18 +92,22 @@ install_yazi() {
     return
   fi
 
-  log "Installing yazi..."
-  local version
-  version="$(curl -fsSL https://api.github.com/repos/sxyazi/yazi/releases/latest | jq -r '.tag_name' | sed 's/^v//')"
-  local url="https://github.com/sxyazi/yazi/releases/download/v${version}/yazi-x86_64-unknown-linux-gnu.zip"
-  local tmp
-  tmp="$(mktemp -d)"
-  curl -fsSL "$url" -o "$tmp/yazi.zip"
-  unzip -q "$tmp/yazi.zip" -d "$tmp"
-  sudo install "$tmp"/yazi-x86_64-unknown-linux-gnu/yazi /usr/local/bin/yazi
-  sudo install "$tmp"/yazi-x86_64-unknown-linux-gnu/ya /usr/local/bin/ya
-  rm -rf "$tmp"
-  log "yazi ${version} installed."
+  log "Installing yazi (building from source — prebuilt binaries require glibc ≥2.39)..."
+
+  # Install Rust toolchain if not present
+  if ! command -v cargo &>/dev/null; then
+    log "Installing Rust toolchain..."
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --quiet
+    # shellcheck source=/dev/null
+    source "$HOME/.cargo/env"
+  fi
+
+  cargo install --locked yazi-fm yazi-cli
+
+  # Place binaries on the system PATH so they're available without cargo env
+  sudo install "$HOME/.cargo/bin/yazi" /usr/local/bin/yazi
+  sudo install "$HOME/.cargo/bin/ya" /usr/local/bin/ya
+  log "yazi installed."
 }
 install_yazi
 
