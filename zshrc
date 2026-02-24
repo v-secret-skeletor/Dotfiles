@@ -14,6 +14,9 @@ CASE_SENSITIVE="true"
 # Enable command auto-correction
 ENABLE_CORRECTION="true"
 
+# Add a theme
+ZSH_THEME="muse"
+
 # Plugins (no brew — not available on Linux codespace)
 plugins=(colored-man-pages gh git golang jsontools)
 
