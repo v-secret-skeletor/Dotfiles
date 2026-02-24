@@ -181,9 +181,8 @@ install_node() {
     return
   fi
 
-  log "Installing Node.js LTS via NodeSource..."
-  curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
-  sudo apt-get install -y -qq nodejs
+  sudo apt-get install -y -qq npm
+  npm install -g n + n 22
   log "Node.js $(node --version), npm $(npm --version) installed."
 }
 install_node
