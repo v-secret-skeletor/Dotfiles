@@ -180,6 +180,11 @@ mkdir -p "$HOME/.config/dotfiles"
 ln -sf "$DOTFILES_DIR/aliases.zsh" "$HOME/.config/dotfiles/aliases.zsh"
 log "  aliases → ~/.config/dotfiles/aliases.zsh"
 
+# Copilot CLI config and skills
+mkdir -p "$HOME/.copilot"
+cp -r "$DOTFILES_DIR/copilot/." "$HOME/.copilot/"
+log "  copilot → ~/.copilot"
+
 # ---------------------------------------------------------------------------
 # 8. vim-plug plugin install (headless)
 # ---------------------------------------------------------------------------
