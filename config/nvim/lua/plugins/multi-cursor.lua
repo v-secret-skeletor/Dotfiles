@@ -1,0 +1,20 @@
+vim.g.VM_maps = {
+	["Find Under"] = "<C-d>",
+	["Find Subword Under"] = "<C-d>",
+	["Add Cursor Up"] = "<C-u>",
+	["Add Cursor Down"] = "<C-m>",
+	["Add Cursor At Pos"] = "<C-a>",
+}
+
+-- \"Find Next":               ['n',         'n'],
+-- \"Find Prev":               ['N',         'n'],
+-- \"Goto Next":               [']',         'n'],
+-- \"Goto Prev":               ['[',         'n'],
+-- \"Seek Up":                 ['<C-b>',     'n'],
+-- \"Seek Down":               ['<C-f>',     'n'],
+-- \"Skip Region":             ['q',         'n'],
+-- \"Remove Region":           ['Q',         'n'],
+-- \"Remove Last Region":      [leader.'q',  'n'],
+-- \"Remove Every n Regions":  [leader.'R',  'n'],
+-- \"Select Operator":         ['s',         'n'],
+-- \"Find Operator":           ['m',         'n'],
