@@ -7,26 +7,6 @@ capabilities.textDocument.foldingRange = {
 	lineFoldingOnly = true,
 }
 
--- Solargraph: Ruby/Rails LSP (installed outside Mason for Ruby 2.7 compat)
-vim.lsp.config("solargraph", {
-	cmd = { "solargraph", "stdio" },
-	filetypes = { "ruby", "eruby" },
-	root_markers = { "Gemfile", ".git" },
-	capabilities = capabilities,
-	settings = {
-		solargraph = {
-			diagnostics = true,
-			completion = true,
-			hover = true,
-			formatting = false,
-			references = true,
-			rename = true,
-			symbols = true,
-		},
-	},
-})
-vim.lsp.enable("solargraph")
-
 -- Enhanced diagnostic configuration
 vim.diagnostic.config({
 	virtual_text = {

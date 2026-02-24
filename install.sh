@@ -142,7 +142,38 @@ install_ohmyzsh() {
 install_ohmyzsh
 
 # ---------------------------------------------------------------------------
-# 7. Symlink / copy configs
+# 7. Ruby (>= 3.2 for ruby-lsp / solargraph compatibility)
+# ---------------------------------------------------------------------------
+install_ruby() {
+  local min_version="3.2"
+
+  if command -v ruby &>/dev/null; then
+    local current
+    current="$(ruby -e 'puts RUBY_VERSION')"
+    if [ "$(printf '%s\n' "$min_version" "$current" | sort -V | head -n1)" = "$min_version" ]; then
+      log "Ruby $current already installed (>= $min_version), skipping."
+      return
+    fi
+  fi
+
+  log "Installing Ruby >= ${min_version} via ruby-install..."
+
+  local ri_version="0.9.4"
+  local tmp
+  tmp="$(mktemp -d)"
+  curl -fsSL "https://github.com/postmodern/ruby-install/releases/download/v${ri_version}/ruby-install-${ri_version}.tar.gz" \
+    -o "$tmp/ruby-install.tar.gz"
+  tar -xzf "$tmp/ruby-install.tar.gz" -C "$tmp"
+  sudo make -C "$tmp/ruby-install-${ri_version}" install
+  rm -rf "$tmp"
+
+  sudo ruby-install --system ruby
+  log "Ruby $(ruby --version) installed."
+}
+install_ruby
+
+# ---------------------------------------------------------------------------
+# 8. Symlink / copy configs
 # ---------------------------------------------------------------------------
 log "Linking configuration files..."
 
@@ -186,14 +217,14 @@ cp -r "$DOTFILES_DIR/copilot/." "$HOME/.copilot/"
 log "  copilot → ~/.copilot"
 
 # ---------------------------------------------------------------------------
-# 8. vim-plug plugin install (headless)
+# 9. vim-plug plugin install (headless)
 # ---------------------------------------------------------------------------
 log "Installing neovim plugins via vim-plug (headless)..."
 nvim --headless +PlugInstall +qall 2>/dev/null || warn "PlugInstall had warnings — plugins may need manual review."
 log "Neovim plugins installed."
 
 # ---------------------------------------------------------------------------
-# 9. yazi plugin install
+# 10. yazi plugin install
 # ---------------------------------------------------------------------------
 log "Installing yazi plugins..."
 if command -v ya &>/dev/null; then
@@ -204,7 +235,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 10. Set default shell to zsh
+# 11. Set default shell to zsh
 # ---------------------------------------------------------------------------
 if [ "$SHELL" != "$(which zsh)" ]; then
   log "Setting default shell to zsh..."
