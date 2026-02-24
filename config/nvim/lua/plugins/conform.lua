@@ -39,6 +39,19 @@ require("conform").setup({
 				"--style={IndentWidth: 2, ColumnLimit: 100, UseTab: Never, AllowShortFunctionsOnASingleLine: None}",
 			},
 		},
+		-- Prefer project-local bin/rubocop over Mason-installed global
+		rubocop = {
+			command = function(self, ctx)
+				local root = vim.fs.root(ctx.buf, { "Gemfile", ".rubocop.yml" })
+				if root then
+					local local_cmd = root .. "/bin/rubocop"
+					if vim.uv.fs_stat(local_cmd) then
+						return local_cmd
+					end
+				end
+				return "rubocop"
+			end,
+		},
 	},
 	-- Format on save for specific file types
 	format_on_save = function(bufnr)

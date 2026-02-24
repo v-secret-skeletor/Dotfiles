@@ -1,4 +1,4 @@
--- require("plugins.auto-session")
+require("plugins.auto-session")
 require("plugins.blink")
 require("plugins.bento")
 require("plugins.colorizer")
