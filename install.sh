@@ -181,8 +181,9 @@ install_node() {
     return
   fi
 
-  sudo apt-get install -y -qq npm
-  npm install -g n + n 22
+  sudo apt-get install -y npm
+  sudo npm install -g n 
+  sudo n 22
   log "Node.js $(node --version), npm $(npm --version) installed."
 }
 install_node
