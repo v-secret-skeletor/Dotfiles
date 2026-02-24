@@ -30,6 +30,28 @@ Replace `<codespace-name>` with the name from `gh codespace list`.
 
 > **Tip:** The glob `/workspaces/*` expands to your repository directory inside the codespace. If you have multiple repos, replace it with the specific path (e.g., `/workspaces/my-repo`).
 
+### Port Forwarding (Accessing Web Apps)
+
+If your codespace runs a web server, forward the port back to your local machine:
+
+```sh
+# From a second local terminal, forward port 3000
+gh codespace ports forward 3000:3000 -c <codespace-name>
+
+# Or include port forwarding when you SSH in
+gh codespace ssh -c <codespace-name> -- -L 3000:localhost:3000
+```
+
+Then open `localhost:3000` in your local browser.
+
+To expose a public URL instead:
+
+```sh
+gh codespace ports visibility 3000:public -c <codespace-name>
+```
+
+This provides a shareable `*.app.github.dev` URL. Use `gh codespace ports -c <codespace-name>` to list all forwarded ports and their URLs.
+
 ### Prerequisites
 
 - [GitHub CLI](https://cli.github.com/) (`gh`) installed locally
