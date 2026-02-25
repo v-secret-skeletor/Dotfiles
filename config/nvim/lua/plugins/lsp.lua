@@ -47,6 +47,26 @@ if vim.lsp.inlay_hint then
 	vim.lsp.inlay_hint.enable(true)
 end
 
+-- Prefer project-local bin/rubocop over Mason-installed global
+vim.lsp.config("ruby_lsp", {
+	capabilities = capabilities,
+	init_options = {
+		formatter = "rubocop",
+		linters = { "rubocop" },
+	},
+	before_init = function(params, config)
+		local root = config.root_dir
+		if root then
+			local local_cmd = root .. "/bin/rubocop"
+			if vim.uv.fs_stat(local_cmd) then
+				params.initializationOptions = vim.tbl_deep_extend("force", params.initializationOptions or {}, {
+					rubocop = { command = local_cmd },
+				})
+			end
+		end
+	end,
+})
+
 local k = vim.keymap.set
 local bufopts = { noremap = true, silent = true, buffer = bufnr }
 
