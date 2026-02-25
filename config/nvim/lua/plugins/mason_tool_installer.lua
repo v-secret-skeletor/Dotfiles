@@ -3,6 +3,7 @@ require("mason-tool-installer").setup({
 		"stylua",
 		"prettierd",
 		"eslint_d",
+		"herb-language-server",
 		"gopls",
 		"typescript-language-server",
 		"erb-formatter",
