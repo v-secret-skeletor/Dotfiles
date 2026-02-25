@@ -7,8 +7,8 @@ lint.linters_by_ft = {
 	python = { "flake8" },
 	rust = { "clippy" },
 	ruby = { "rubocop" },
-	javascript = { "eslint" },
-	typescript = { "eslint" },
+	javascript = { "eslint_d" },
+	typescript = { "eslint_d" },
 	toml = { "tombi" },
 	json = { "jsonlint" },
 }

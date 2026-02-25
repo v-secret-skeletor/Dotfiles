@@ -74,6 +74,7 @@ Plug("stevearc/conform.nvim") -- conform formatter
 Plug("theHamsta/nvim-dap-virtual-text") -- dap virtual text
 Plug("TheNoeTrevino/haunt.nvim") -- Add buffered comments that are not attached to code
 Plug("tpope/vim-dispatch") -- Asynchronous execution
+Plug("WhoIsSethDaniel/mason-tool-installer.nvim") -- Mason tool installer
 Plug("vim-scripts/SpellCheck") -- Spell checking
 Plug("zbirenbaum/copilot.lua") -- copilot lsp
 

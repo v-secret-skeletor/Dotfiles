@@ -21,7 +21,7 @@ require("conform").setup({
 		-- Python formatting with black and isort
 		python = { "isort", "black" },
 		-- Ruby formatting
-		ruby = { "rubocop" },
+		ruby = { "erb-formatter", "rubocop" },
 		-- TypeScript formatting
 		typescript = { "prettierd", "prettier" },
 		typescriptreact = { "prettierd", "prettier" },

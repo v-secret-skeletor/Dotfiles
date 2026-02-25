@@ -44,3 +44,6 @@ export NVM_DIR="$HOME/.nvm"
 if command -v zoxide &> /dev/null; then
   eval "$(zoxide init zsh)"
 fi
+
+export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.2
+
