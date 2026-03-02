@@ -6,6 +6,11 @@ require("auto-session").setup({
 	args_allow_files_autosave = true,
 	close_filetypes_on_save = { "checkhealth", "sidekick_terminal", "grug-far", "toggleterm" },
 	allowed_dirs = { "/workspaces/*" },
+	pre_restore_cmds = {
+		function()
+			vim.lsp.stop_client(vim.lsp.get_clients(), true)
+		end,
+	},
 })
 vim.keymap.set("n", "<leader>ss", ":AutoSession save<CR>", { desc = "Save session" })
 vim.keymap.set("n", "<leader>sl", ":AutoSession search<CR>", { desc = "Load session" })

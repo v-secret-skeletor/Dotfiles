@@ -26,6 +26,7 @@ sudo apt-get install -y -qq \
   curl \
   fd-find \
   jq \
+  npm \
   ripgrep \
   unzip \
   wget \
@@ -176,12 +177,7 @@ install_ruby
 # 8. Node.js & npm (needed for TypeScript / JavaScript LSPs)
 # ---------------------------------------------------------------------------
 install_node() {
-  if command -v npm &>/dev/null; then
-    log "npm $(npm --version) already installed, skipping."
-    return
-  fi
 
-  sudo apt-get install -y npm
   sudo npm install -g n 
   sudo n 22
   log "Node.js $(node --version), npm $(npm --version) installed."
