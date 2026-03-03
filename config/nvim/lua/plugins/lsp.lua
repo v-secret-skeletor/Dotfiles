@@ -47,6 +47,24 @@ if vim.lsp.inlay_hint then
 	vim.lsp.inlay_hint.enable(true)
 end
 
+vim.lsp.config("rubocop", {
+	capabilities = capabilities,
+	cmd = function(dispatchers, config)
+		local cmd = { "rubocop", "--lsp" }
+		if config.root_dir then
+			local local_cmd = config.root_dir .. "/bin/rubocop"
+			if vim.uv.fs_stat(local_cmd) then
+				cmd = { local_cmd, "--lsp" }
+			end
+		end
+		return vim.lsp.rpc.start(cmd, dispatchers, {
+			cwd = config.cmd_cwd,
+			env = config.cmd_env,
+			detached = config.detached,
+		})
+	end,
+})
+
 -- Prefer project-local bin/rubocop over Mason-installed global
 vim.lsp.config("ruby_lsp", {
 	capabilities = capabilities,
