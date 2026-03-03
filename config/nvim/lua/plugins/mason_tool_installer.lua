@@ -6,7 +6,7 @@ require("mason-tool-installer").setup({
 		"herb_ls",
 		"gopls",
 		"ts_ls",
-		"erb_formatter",
+		"erb-formatter",
 		"ruby_lsp",
 		"rubocop",
 		"sorbet",
