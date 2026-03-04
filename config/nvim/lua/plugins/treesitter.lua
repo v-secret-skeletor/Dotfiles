@@ -17,6 +17,13 @@ vim.api.nvim_create_autocmd("FileType", {
 	end,
 })
 
+local parsers = { "ruby", "go", "javascript", "typescript", "css" }
+for _, lang in ipairs(parsers) do
+	if not pcall(vim.treesitter.language.inspect, lang) then
+		vim.cmd("TSInstall " .. lang)
+	end
+end
+
 -- Treesitter-based folding
 vim.opt.foldmethod = "expr"
 vim.opt.foldexpr = "v:lua.vim.treesitter.foldexpr()"
