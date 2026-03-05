@@ -185,7 +185,31 @@ install_node() {
 install_node
 
 # ---------------------------------------------------------------------------
-# 9. Symlink / copy configs
+# 9. Nerd Fonts (JetBrainsMono)
+# ---------------------------------------------------------------------------
+install_nerdfonts() {
+  local font_dir="/usr/local/share/fonts/NerdFonts"
+
+  if fc-list | grep -qi "JetBrainsMono" 2>/dev/null; then
+    log "JetBrainsMono Nerd Font already installed, skipping."
+    return
+  fi
+
+  log "Installing JetBrainsMono Nerd Font..."
+  local url="https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.zip"
+  local tmp
+  tmp="$(mktemp -d)"
+  curl -fsSL "$url" -o "$tmp/JetBrainsMono.zip"
+  sudo mkdir -p "$font_dir"
+  sudo unzip -oq "$tmp/JetBrainsMono.zip" -d "$font_dir"
+  rm -rf "$tmp"
+  sudo fc-cache -f
+  log "JetBrainsMono Nerd Font installed."
+}
+install_nerdfonts
+
+# ---------------------------------------------------------------------------
+# 10. Symlink / copy configs
 # ---------------------------------------------------------------------------
 log "Linking configuration files..."
 
@@ -229,14 +253,14 @@ cp -r "$DOTFILES_DIR/copilot/." "$HOME/.copilot/"
 log "  copilot → ~/.copilot"
 
 # ---------------------------------------------------------------------------
-# 10. vim-plug plugin install (headless)
+# 11. vim-plug plugin install (headless)
 # ---------------------------------------------------------------------------
 log "Installing neovim plugins via vim-plug (headless)..."
 nvim --headless +PlugInstall +qall 2>/dev/null || warn "PlugInstall had warnings — plugins may need manual review."
 log "Neovim plugins installed."
 
 # ---------------------------------------------------------------------------
-# 11. yazi plugin install
+# 12. yazi plugin install
 # ---------------------------------------------------------------------------
 log "Installing yazi plugins..."
 if command -v ya &>/dev/null; then
@@ -247,7 +271,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 12. Set default shell to zsh
+# 13. Set default shell to zsh
 # ---------------------------------------------------------------------------
 if [ "$SHELL" != "$(which zsh)" ]; then
   log "Setting default shell to zsh..."
