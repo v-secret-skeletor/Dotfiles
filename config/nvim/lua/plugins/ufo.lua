@@ -45,7 +45,15 @@ require("ufo").setup({
 			vim = { "treesitter", "indent" },
 		}
 
-		return ft_providers[filetype] or { "treesitter", "indent" }
+		if ft_providers[filetype] then
+			return ft_providers[filetype]
+		end
+
+		local lsp_provider = get_lsp_fold_provider(bufnr)
+		if lsp_provider then
+			return { "lsp", "indent" }
+		end
+		return { "treesitter", "indent" }
 	end,
 	-- Preview fold content when hovering
 	preview = {
