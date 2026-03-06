@@ -19,14 +19,15 @@ vim.api.nvim_create_autocmd("FileType", {
 
 local parsers = { "ruby", "go", "javascript", "typescript", "css" }
 vim.api.nvim_create_autocmd("VimEnter", {
-    desc = "Install missing treesitter parsers on startup",
-    once = true,
-    callback = function()
-    for _, lang in ipairs(parsers) do
-    	if not pcall(vim.treesitter.language.inspect, lang) then
-    		vim.cmd("TSInstall " .. lang)
-    	end
-    end,
+	desc = "Install missing treesitter parsers on startup",
+	once = true,
+	callback = function()
+		for _, lang in ipairs(parsers) do
+			if not pcall(vim.treesitter.language.inspect, lang) then
+				vim.cmd("TSInstall " .. lang)
+			end
+		end
+	end,
 })
 
 -- Treesitter-based folding
