@@ -69,7 +69,8 @@ Plug("ray-x/go.nvim") -- Go development plugin
 Plug("rcarriga/nvim-dap-ui") -- dap ui
 Plug("rmagatti/auto-session") -- Session management
 Plug("Saghen/blink.cmp") -- blink completion source
-Plug("serhez/bento.nvim") -- buffer manager
+-- Plug("serhez/bento.nvim") -- buffer manager
+Plug("jadonwb/bento.nvim") -- buffer manager
 Plug("stevearc/conform.nvim") -- conform formatter
 Plug("theHamsta/nvim-dap-virtual-text") -- dap virtual text
 Plug("TheNoeTrevino/haunt.nvim") -- Add buffered comments that are not attached to code
