@@ -15,6 +15,35 @@ log() { echo "$LOG_PREFIX $*"; }
 warn() { echo "$LOG_PREFIX [WARN] $*" >&2; }
 err() { echo "$LOG_PREFIX [ERROR] $*" >&2; }
 
+FAILED_INSTALLS=()
+
+# Run an installer in a subshell with retries. If all attempts fail the
+# failure is recorded but the script continues.
+#   safe_install <label> <function> [max_attempts]
+safe_install() {
+  local name="$1"
+  local func="$2"
+  local max_attempts="${3:-3}"
+  local attempt=1
+  local rc
+
+  while [ "$attempt" -le "$max_attempts" ]; do
+    rc=0
+    ("$func") || rc=$?
+    if [ "$rc" -eq 0 ]; then
+      return 0
+    fi
+    if [ "$attempt" -lt "$max_attempts" ]; then
+      warn "$name: attempt $attempt/$max_attempts failed (exit $rc). Retrying in 5s..."
+      sleep 5
+    fi
+    ((attempt++))
+  done
+
+  warn "$name installation failed after $max_attempts attempts — continuing."
+  FAILED_INSTALLS+=("$name")
+}
+
 # ---------------------------------------------------------------------------
 # 1. System packages
 # ---------------------------------------------------------------------------
@@ -59,7 +88,7 @@ install_neovim() {
   rm -rf "$tmp"
   log "Neovim $(nvim --version | head -1) installed."
 }
-install_neovim
+safe_install "neovim" install_neovim
 
 # ---------------------------------------------------------------------------
 # 3. lazygit
@@ -71,8 +100,9 @@ install_lazygit() {
   fi
 
   log "Installing lazygit..."
-  local version
-  version="$(curl -fsSL https://api.github.com/repos/jesseduffield/lazygit/releases/latest | jq -r '.tag_name' | sed 's/^v//')"
+  local latest_url
+  latest_url="$(curl -fsSL -o /dev/null -w '%{url_effective}' https://github.com/jesseduffield/lazygit/releases/latest)"
+  local version="${latest_url##*/v}"
   local url="https://github.com/jesseduffield/lazygit/releases/download/v${version}/lazygit_${version}_Linux_x86_64.tar.gz"
   local tmp
   tmp="$(mktemp -d)"
@@ -82,7 +112,7 @@ install_lazygit() {
   rm -rf "$tmp"
   log "lazygit ${version} installed."
 }
-install_lazygit
+safe_install "lazygit" install_lazygit
 
 # ---------------------------------------------------------------------------
 # 4. yazi
@@ -110,7 +140,7 @@ install_yazi() {
   sudo install "$HOME/.cargo/bin/ya" /usr/local/bin/ya
   log "yazi installed."
 }
-install_yazi
+safe_install "yazi" install_yazi
 
 # ---------------------------------------------------------------------------
 # 5. zoxide
@@ -125,7 +155,7 @@ install_zoxide() {
   curl -fsSL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | bash
   log "zoxide installed."
 }
-install_zoxide
+safe_install "zoxide" install_zoxide
 
 # ---------------------------------------------------------------------------
 # 6. oh-my-zsh
@@ -140,7 +170,7 @@ install_ohmyzsh() {
   sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
   log "oh-my-zsh installed."
 }
-install_ohmyzsh
+safe_install "oh-my-zsh" install_ohmyzsh
 
 # ---------------------------------------------------------------------------
 # 7. Ruby (>= 3.2 for ruby-lsp / solargraph compatibility)
@@ -171,7 +201,7 @@ install_ruby() {
   sudo ruby-install --system ruby
   log "Ruby $(ruby --version) installed."
 }
-install_ruby
+safe_install "ruby" install_ruby
 
 # ---------------------------------------------------------------------------
 # 8. Node.js & npm (needed for TypeScript / JavaScript LSPs)
@@ -182,7 +212,7 @@ install_node() {
   sudo n 22
   log "Node.js $(node --version), npm $(npm --version) installed."
 }
-install_node
+safe_install "node" install_node
 
 # ---------------------------------------------------------------------------
 # 9. Nerd Fonts (JetBrainsMono)
@@ -206,7 +236,7 @@ install_nerdfonts() {
   sudo fc-cache -f
   log "JetBrainsMono Nerd Font installed."
 }
-install_nerdfonts
+safe_install "nerdfonts" install_nerdfonts
 
 # ---------------------------------------------------------------------------
 # 10. Symlink / copy configs
@@ -281,4 +311,9 @@ fi
 # ---------------------------------------------------------------------------
 # Done
 # ---------------------------------------------------------------------------
+if [ ${#FAILED_INSTALLS[@]} -gt 0 ]; then
+  warn "The following installations failed: ${FAILED_INSTALLS[*]}"
+  warn "Re-run this script or install them manually."
+fi
+
 log "Dotfiles bootstrap complete."
