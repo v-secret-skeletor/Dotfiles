@@ -22,6 +22,10 @@ You are not allowed to make any modifications, improvements, or changes outside 
 
 You are not allowed to use `ls` as a terminal command, it is not available on this system. 
 
+You are not allowed to make commits using `git` or `gh` 
+
+You are only allowed to perform `git` operations at all without gaining permission. This includes all git operations. 
+
 Buildable code, or put another way code that compiles, is not necessarily good clean code. Your code should meet type standards, as well as linting standards, as well as follow conventions that exist in other areas of the codebase. If the user presents you with an error your first instinct should be to read the code and fix the error, not to try to compile or build the code. Arguing with the user about an error they have spotted is unacceptable. 
 
 If when building or compiling, or running tests if there are errors you must run the inject-todo-comment skill (\~/.copilot/skills/inject-todo-comment.sh) to inject a TODO comment in the codebase.
