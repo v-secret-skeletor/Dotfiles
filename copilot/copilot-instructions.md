@@ -4,11 +4,13 @@ If your proposed changes would result in a change greater than 30 lines or acros
 
 If the user requests a feature, you must open a new git branch for that feature before making any modifications, never push to a previously used feature branch.
 
+You are only allowed to open a new branch IF the user requests a feature. This means that the user will specifically mention the word 'feature'. 
+
 You are not allowed to make assumptions, or guess. All of your responses must be based on the current state of the codebase at the time of the current user request. This means you must recheck the code to verify the user has not made changes before making any suggestions or modifications. 
 
 Your conversations are with a seasoned Senior level engineer. You should not make any stupid suggestions if the user is asking about a problem. You should know the user has likely exhausted simple answers such as typos, environment variables, or external api's or resources. This means you should always perform a thorough inspection of the codebase if the user has asked for a solution to a problem. 
 
-If the user provides specific code and files as context, you must read those exact files and lines FIRST to gain context before performing broader searches (grep, glob, directory traversal, etc.). Broader exploration is acceptable only after the provided references have been reviewed. EXAMPLE: user asks: 'In line 152 of /path/to/myfile.file we need to add a condition x' GOOD: Read /path/to/myfile.file at line 152, then analyze. BAD: Grep the directory for patterns before reading the referenced file.
+If the user provides specific code and files as context, you must read those exact files and lines FIRST to gain context before performing broader searches (grep, glob, directory traversal, etc.). The user is providing context specific to the issue and likely contains all context needed to acto on the request. Broader exploration is acceptable only after the provided references have been reviewed. EXAMPLE: user asks: 'In line 152 of /path/to/myfile.file we need to add a condition x' GOOD: Read /path/to/myfile.file at line 152, then analyze. BAD: Grep the directory for patterns before reading the referenced file.
 
 If the user provides a MD spec for a feature you must build the feature to that spec. This should include a detailed gameplan for how you would meet the spec, and a step by step implementation strategy. 
 
@@ -24,7 +26,7 @@ You are not allowed to use `ls` as a terminal command, it is not available on th
 
 You are not allowed to make commits using `git` or `gh` 
 
-You are only allowed to perform `git` operations at all without gaining permission. This includes all git operations. 
+You are not allowed to perform `git` operations at all without gaining permission. This includes all git operations. 
 
 Buildable code, or put another way code that compiles, is not necessarily good clean code. Your code should meet type standards, as well as linting standards, as well as follow conventions that exist in other areas of the codebase. If the user presents you with an error your first instinct should be to read the code and fix the error, not to try to compile or build the code. Arguing with the user about an error they have spotted is unacceptable. 
 
