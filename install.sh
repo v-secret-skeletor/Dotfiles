@@ -239,7 +239,38 @@ install_nerdfonts() {
 safe_install "nerdfonts" install_nerdfonts
 
 # ---------------------------------------------------------------------------
-# 10. Symlink / copy configs
+# 10. tree-sitter CLI
+# ---------------------------------------------------------------------------
+install_tree_sitter() {
+  if command -v tree-sitter &>/dev/null; then
+    log "tree-sitter CLI already installed, skipping."
+    return
+  fi
+
+  log "Installing tree-sitter CLI..."
+
+  # Ensure Rust toolchain is available (installed during yazi step)
+  if ! command -v cargo &>/dev/null; then
+    if [ -f "$HOME/.cargo/env" ]; then
+      # shellcheck source=/dev/null
+      source "$HOME/.cargo/env"
+    else
+      log "Installing Rust toolchain..."
+      curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --quiet
+      # shellcheck source=/dev/null
+      source "$HOME/.cargo/env"
+    fi
+  fi
+
+  cargo install tree-sitter-cli
+
+  sudo install "$HOME/.cargo/bin/tree-sitter" /usr/local/bin/tree-sitter
+  log "tree-sitter CLI $(tree-sitter --version) installed."
+}
+safe_install "tree-sitter" install_tree_sitter
+
+# ---------------------------------------------------------------------------
+# 11. Symlink / copy configs
 # ---------------------------------------------------------------------------
 log "Linking configuration files..."
 
@@ -283,14 +314,14 @@ cp -r "$DOTFILES_DIR/copilot/." "$HOME/.copilot/"
 log "  copilot → ~/.copilot"
 
 # ---------------------------------------------------------------------------
-# 11. vim-plug plugin install (headless)
+# 12. vim-plug plugin install (headless)
 # ---------------------------------------------------------------------------
 log "Installing neovim plugins via vim-plug (headless)..."
 nvim --headless +PlugInstall +qall 2>/dev/null || warn "PlugInstall had warnings — plugins may need manual review."
 log "Neovim plugins installed."
 
 # ---------------------------------------------------------------------------
-# 12. yazi plugin install
+# 13. yazi plugin install
 # ---------------------------------------------------------------------------
 log "Installing yazi plugins..."
 if command -v ya &>/dev/null; then
@@ -301,7 +332,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 13. Set default shell to zsh
+# 14. Set default shell to zsh
 # ---------------------------------------------------------------------------
 if [ "$SHELL" != "$(which zsh)" ]; then
   log "Setting default shell to zsh..."
