@@ -10,6 +10,8 @@ vim.keymap.set("n", "k", "kzz", { desc = "Move up and center" })
 vim.keymap.set("n", "l", "lzz", { desc = "Move right and center" })
 vim.keymap.set("n", "$", "$zz", { desc = "Move to end of line and center" })
 vim.keymap.set("n", "_", "_zz", { desc = "Move to beginning of line and center" })
+vim.keymap.set("n", "{", "{zz", { desc = "Move to previous paragraph and center" })
+vim.keymap.set("n", "}", "}zz", { desc = "Move to next paragraph and center" })
 
 -- bookmarks
 -- Delete single bookmark
