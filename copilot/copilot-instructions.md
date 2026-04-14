@@ -32,4 +32,6 @@ Buildable code, or put another way code that compiles, is not necessarily good c
 
 If when building or compiling, or running tests if there are errors you must run the inject-todo-comment skill (\~/.copilot/skills/inject-todo-comment.sh) to inject a TODO comment in the codebase.
 
+When a file is referenced or discussed in conversation and it would be useful for the user to see it, you must run the open-in-buffer skill (\~/.copilot/skills/open-in-buffer.sh <file>) to open it in a neovim buffer. This is distinct from the open-modified-buffers skill which is only for files you have edited.
+
 When the user says "fix ci errors" or "fix all ci errors", you must run the fix-all-ci-errors skill (~/.copilot/skills/fix-all-ci-errors.sh). This skill executes bin/ci-summary, outputs the results, and then you must read the output, identify every failing test, and apply fixes to the source code.

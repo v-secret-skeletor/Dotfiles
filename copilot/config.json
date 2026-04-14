@@ -1,0 +1,13 @@
+{
+  "firstLaunchAt": "2026-04-10T15:32:06.993Z",
+  "staff": true,
+  "logLevel": "all",
+  "trusted_folders": ["/workspaces/github-ui", "/workspaces/github"],
+  "sessionSync": [
+    {
+      "origin": "*",
+      "level": "local"
+    }
+  ],
+  "banner": "never"
+}
