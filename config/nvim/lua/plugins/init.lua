@@ -1,6 +1,6 @@
 require("plugins.auto-session")
 require("plugins.blink")
-require("plugins.bento")
+-- require("plugins.bento")
 require("plugins.colorizer")
 require("plugins.colorscheme")
 require("plugins.conform")

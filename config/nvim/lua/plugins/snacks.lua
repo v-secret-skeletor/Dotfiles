@@ -93,9 +93,9 @@ local bufOpts = {
 		},
 	},
 }
--- vim.keymap.set("n", ";", function()
--- 	Snacks.picker.buffers(bufOpts)
--- end, { desc = "Snacks Picker Buffers" })
+vim.keymap.set("n", ";", function()
+	Snacks.picker.buffers(bufOpts)
+end, { desc = "Snacks Picker Buffers" })
 
 vim.keymap.set("n", "<leader>f", function()
 	Snacks.picker.grep()
