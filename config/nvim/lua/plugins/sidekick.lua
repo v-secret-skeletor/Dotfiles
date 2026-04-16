@@ -25,19 +25,19 @@ require("sidekick").setup({
 })
 
 vim.keymap.set("n", "<leader>cc", function()
-	require("sidekick.cli").toggle()
+	require("sidekick.cli").toggle({ name = "copilot", focus = true })
 end, { desc = "Sidekick toggle" })
 
 vim.keymap.set("v", "<leader>cu", function()
-	require("sidekick.cli").send({ msg = "{selection}" })
+	require("sidekick.cli").send({ name = "copilot", msg = "{selection}" })
 end, { desc = "Sidekick send selection" })
 
 vim.keymap.set("n", "<leader>cu", function()
-	require("sidekick.cli").send({ msg = "{file}" })
+	require("sidekick.cli").send({ name = "copilot", msg = "{file}" })
 end, { desc = "Sidekick send file" })
 
 vim.keymap.set("n", "<leader>cp", function()
-	require("sidekick.cli").prompt()
+	require("sidekick.cli").prompt({ name = "copilot" })
 end, { silent = true, desc = "Sidekick prompt" })
 
 vim.keymap.set("n", "<leader>cd", function()
