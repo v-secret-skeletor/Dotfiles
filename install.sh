@@ -299,6 +299,10 @@ log "  vimrc → ~/.vimrc"
 ln -sf "$DOTFILES_DIR/gitconfig" "$HOME/.gitconfig"
 log "  gitconfig → ~/.gitconfig"
 
+# .gitignore_global
+cp "$DOTFILES_DIR/.gitignore_global" "$HOME/.gitignore_global"
+log "  gitignore_global → ~/.gitignore_global"
+
 # .zshrc
 ln -sf "$DOTFILES_DIR/zshrc" "$HOME/.zshrc"
 log "  zshrc → ~/.zshrc"
