@@ -69,6 +69,7 @@ Plug("ray-x/go.nvim") -- Go development plugin
 Plug("rcarriga/nvim-dap-ui") -- dap ui
 Plug("rmagatti/auto-session") -- Session management
 Plug("Saghen/blink.cmp") -- blink completion source
+Plug("Saghen/blink.lib") -- blink cmp requirement
 -- Plug("serhez/bento.nvim") -- buffer manager
 Plug("jadonwb/bento.nvim") -- buffer manager
 Plug("stevearc/conform.nvim") -- conform formatter
