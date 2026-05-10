@@ -123,7 +123,8 @@ install_yazi() {
     return
   fi
 
-  log "Installing yazi (building from source — prebuilt binaries require glibc ≥2.39)..."
+  local yazi_version="26.1.22"
+  log "Installing yazi v${yazi_version} (building from git — crates.io builds require yazi-build wrapper)..."
 
   # Install Rust toolchain if not present
   if ! command -v cargo &>/dev/null; then
@@ -133,14 +134,21 @@ install_yazi() {
     source "$HOME/.cargo/env"
   fi
 
-  cargo install --locked --force --version 26.1.22 yazi-fm
+  local tmp
+  tmp="$(mktemp -d)"
+  git clone --depth 1 --branch "v${yazi_version}" https://github.com/sxyazi/yazi.git "$tmp/yazi"
+  cargo install --locked --force --path "$tmp/yazi/yazi-fm"
+  cargo install --locked --force --path "$tmp/yazi/yazi-cli"
+  rm -rf "$tmp"
 
   # Place binaries on the system PATH so they're available without cargo env
   sudo install "$HOME/.cargo/bin/yazi" /usr/local/bin/yazi
   sudo install "$HOME/.cargo/bin/ya" /usr/local/bin/ya
-  log "yazi installed."
+  log "yazi v${yazi_version} installed."
 }
 safe_install "yazi" install_yazi
+
+
 
 # ---------------------------------------------------------------------------
 # 5. zoxide
