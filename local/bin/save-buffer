@@ -1,0 +1,21 @@
+#!/bin/bash
+#
+# Saves a Neovim buffer for the given file path.
+# Usage: save-buffer <file>
+#
+# Requires $NVIM to be set (automatic inside neovim's :terminal).
+# Exits with error if the file is not loaded as a buffer.
+
+FILE="$1"
+[[ -z "$FILE" ]] && { echo "usage: save-buffer <file>" >&2; exit 1; }
+
+NVIM_SOCKET="${NVIM:-${NVIM_LISTEN_ADDRESS:-}}"
+[[ -z "$NVIM_SOCKET" ]] && exit 0
+
+ABS_FILE="$(realpath "$FILE")"
+
+result=$(NVIM_AGENT_FILE="$ABS_FILE" nvim --server "$NVIM_SOCKET" --remote-expr \
+  "luaeval('local f=os.getenv([[NVIM_AGENT_FILE]]); local b=vim.fn.bufnr(f); if b~=-1 and vim.api.nvim_buf_is_loaded(b) then vim.api.nvim_buf_call(b,function() vim.cmd([[write]]) end); return [[saved]] else return [[not found]] end')" 2>/dev/null)
+
+echo "$result"
+[[ "$result" == "saved" ]] && exit 0 || exit 1

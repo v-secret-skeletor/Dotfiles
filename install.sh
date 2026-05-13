@@ -320,10 +320,23 @@ mkdir -p "$HOME/.config/dotfiles"
 ln -sf "$DOTFILES_DIR/aliases.zsh" "$HOME/.config/dotfiles/aliases.zsh"
 log "  aliases → ~/.config/dotfiles/aliases.zsh"
 
-# Copilot CLI config and skills
+# Copilot CLI config, skills, and agents
 mkdir -p "$HOME/.copilot"
 cp -r "$DOTFILES_DIR/copilot/." "$HOME/.copilot/"
 log "  copilot → ~/.copilot"
+
+# Agent skills
+if [ -L "$HOME/.agent-skills" ] || [ -d "$HOME/.agent-skills" ]; then
+  rm -rf "$HOME/.agent-skills"
+fi
+cp -r "$DOTFILES_DIR/agent-skills" "$HOME/.agent-skills"
+log "  agent-skills → ~/.agent-skills"
+
+# Local bin scripts
+mkdir -p "$HOME/.local/bin"
+cp "$DOTFILES_DIR/local/bin/"* "$HOME/.local/bin/"
+chmod +x "$HOME/.local/bin/"*
+log "  local/bin → ~/.local/bin"
 
 # ---------------------------------------------------------------------------
 # 12. vim-plug plugin install (headless)

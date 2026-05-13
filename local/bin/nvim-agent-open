@@ -1,0 +1,28 @@
+#!/bin/bash
+#
+# Opens files as Neovim buffers via the parent Neovim's RPC socket.
+# Usage: nvim-agent-open <file1> [file2] ...
+#
+# Works from any terminal with $NVIM set (sidekick.nvim, :terminal, etc).
+
+NVIM_SOCKET="${NVIM:-${NVIM_LISTEN_ADDRESS:-}}"
+
+if [[ -z "$NVIM_SOCKET" ]]; then
+  exit 0  # not inside neovim, silently skip
+fi
+
+if [[ $# -eq 0 ]]; then
+  echo "usage: nvim-agent-open <file> [file...]" >&2
+  exit 1
+fi
+
+for file in "$@"; do
+  if [[ -f "$file" ]]; then
+    abs_path="$(realpath "$file")"
+    nvim --server "$NVIM_SOCKET" --remote-expr "execute('badd $abs_path')" > /dev/null 2>&1
+  else
+    echo "warn: skipping '$file' (not a regular file)" >&2
+  fi
+done
+
+nvim --server "$NVIM_SOCKET" --remote-expr "execute('set autoread | checktime')" > /dev/null 2>&1

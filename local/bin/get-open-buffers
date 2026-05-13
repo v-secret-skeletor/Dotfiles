@@ -1,0 +1,16 @@
+#!/bin/bash
+#
+# Lists all open Neovim buffers with name, filetype, and unsaved status.
+# Usage: get-open-buffers
+# Output: JSON array of {nr, name, filetype, modified}
+
+NVIM_SOCKET="${NVIM:-${NVIM_LISTEN_ADDRESS:-}}"
+[[ -z "$NVIM_SOCKET" ]] && { echo "error: no neovim socket found" >&2; exit 1; }
+
+TMP=$(mktemp)
+trap 'rm -f "$TMP"' EXIT
+
+nvim --server "$NVIM_SOCKET" --remote-expr \
+  "luaeval('local f=io.open([[${TMP}]],[[w]]); local r={}; for _,b in ipairs(vim.api.nvim_list_bufs()) do if vim.api.nvim_buf_is_loaded(b) and vim.fn.buflisted(b)==1 then local n=vim.api.nvim_buf_get_name(b); if n~=[[]] then table.insert(r,{nr=b,name=n,filetype=vim.api.nvim_buf_get_option(b,[[filetype]]),modified=vim.api.nvim_buf_get_option(b,[[modified]])}) end end end; f:write(vim.json.encode(r)); f:close(); return 1')" > /dev/null 2>&1
+
+[[ -s "$TMP" ]] && cat "$TMP" || echo "[]"

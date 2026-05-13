@@ -1,0 +1,643 @@
+#!/usr/bin/env python3
+"""worktree-manager — concurrent agent worktree orchestrator"""
+
+import argparse
+import fcntl
+import json
+import os
+import re
+import shlex
+import subprocess
+import sys
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+
+STATE_DIR = Path.home() / ".local" / "share" / "worktree-manager"
+STATE_FILE = STATE_DIR / "state.json"
+LOGS_DIR = STATE_DIR / "logs"
+MAX_WORKTREES = 5
+STALL_TIMEOUT = 600  # 10 minutes in seconds
+
+GUARDRAIL_PROMPT = (
+    "You are a concurrent background agent running autonomously in an isolated git worktree. "
+    "Proceed with the task without asking for confirmation EXCEPT for the following operations — "
+    "if you need to perform any of these, output exactly 'GUARDRAIL: <description>' and stop: "
+    "(1) git reset --hard, git push --force, or git branch -D; "
+    "(2) rm -rf or bulk deletion of files/directories outside your worktree scope; "
+    "(3) database schema changes (ALTER TABLE, DROP TABLE, migrations); "
+    "(4) writes to external services (API mutations, emails, webhooks, publishing)."
+)
+
+
+# ── state ──────────────────────────────────────────────────────────────────────
+
+def _acquire_lock():
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    lock = open(STATE_DIR / ".lock", "w")
+    fcntl.flock(lock, fcntl.LOCK_EX)
+    return lock
+
+
+def load_state():
+    if not STATE_FILE.exists():
+        return {"version": 1, "worktrees": []}
+    with open(STATE_FILE) as f:
+        return json.load(f)
+
+
+def save_state(state):
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    with open(STATE_FILE, "w") as f:
+        json.dump(state, f, indent=2)
+
+
+def find_wt(state, wt_id):
+    for wt in state["worktrees"]:
+        if wt["id"] == wt_id:
+            return wt
+    return None
+
+
+def now_iso():
+    return datetime.now(timezone.utc).isoformat()
+
+
+def now_ts():
+    return time.time()
+
+
+# ── git ────────────────────────────────────────────────────────────────────────
+
+def git_root(path=None):
+    try:
+        r = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True, text=True,
+            cwd=path or ".", check=True,
+        )
+        return r.stdout.strip()
+    except subprocess.CalledProcessError:
+        return None
+
+
+def current_branch(repo):
+    r = subprocess.run(
+        ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+        capture_output=True, text=True, cwd=repo, check=True,
+    )
+    return r.stdout.strip()
+
+
+def branch_exists(repo, branch):
+    r = subprocess.run(
+        ["git", "rev-parse", "--verify", branch],
+        capture_output=True, cwd=repo,
+    )
+    return r.returncode == 0
+
+
+def make_slug(task, max_len=40):
+    s = task.lower()
+    s = re.sub(r"[^a-z0-9\s-]", "", s)
+    s = re.sub(r"\s+", "-", s.strip())
+    s = re.sub(r"-+", "-", s)
+    return s[:max_len].rstrip("-")
+
+
+def gen_id():
+    import random, string
+    return "wt-" + "".join(random.choices(string.ascii_lowercase + string.digits, k=6))
+
+
+# ── stall check ────────────────────────────────────────────────────────────────
+
+def check_and_mark_stalls(state):
+    """Mark running worktrees as stalled if log is idle > STALL_TIMEOUT. Returns list of stalled IDs."""
+    stalled = []
+    now = now_ts()
+    for wt in state["worktrees"]:
+        if wt["status"] != "running":
+            continue
+        log_file = LOGS_DIR / f"{wt['id']}.log"
+        if log_file.exists():
+            ref_time = log_file.stat().st_mtime
+        else:
+            ref_time = datetime.fromisoformat(wt["created_at"]).timestamp()
+        if now - ref_time > STALL_TIMEOUT:
+            wt["status"] = "stalled"
+            stalled.append(wt["id"])
+    return stalled
+
+
+# ── agent launch ───────────────────────────────────────────────────────────────
+
+def build_agent_cmd(agent, task):
+    if agent == "claude":
+        return [
+            "claude",
+            "--permission-mode", "bypassPermissions",
+            "--append-system-prompt", GUARDRAIL_PROMPT,
+            task,
+        ]
+    elif agent == "cursor":
+        return ["cursor-agent", task]
+    elif agent == "copilot":
+        return ["gh", "copilot", "suggest", "-t", "shell", task]
+    else:
+        return [agent, task]
+
+
+def launch_worktree(wt):
+    """Create git worktree, write launcher script, start tmux session."""
+    LOGS_DIR.mkdir(parents=True, exist_ok=True)
+    wt_id = wt["id"]
+    repo = wt["repo"]
+    wt_path = wt["path"]
+    branch = wt["branch"]
+    log_file = LOGS_DIR / f"{wt_id}.log"
+    launch_script = LOGS_DIR / f"{wt_id}-launch.sh"
+    manager_bin = str(Path.home() / ".local" / "bin" / "worktree-manager")
+
+    # Create the git worktree
+    subprocess.run(
+        ["git", "worktree", "add", "-b", branch, wt_path],
+        cwd=repo, check=True,
+    )
+
+    # Build the agent command with proper quoting
+    agent_cmd_parts = build_agent_cmd(wt["agent"], wt["task"])
+    quoted_cmd = " ".join(shlex.quote(a) for a in agent_cmd_parts)
+
+    # Write launcher script
+    launch_script.write_text(
+        "#!/usr/bin/env bash\n"
+        "set -eo pipefail\n"
+        f"exec > >(tee -a {shlex.quote(str(log_file))}) 2>&1\n"
+        f"cd {shlex.quote(wt_path)}\n"
+        f"{quoted_cmd}\n"
+        "EXIT_CODE=$?\n"
+        f"{shlex.quote(manager_bin)} _complete {shlex.quote(wt_id)} $EXIT_CODE\n"
+    )
+    launch_script.chmod(0o755)
+
+    # Check tmux is available
+    if subprocess.run(["which", "tmux"], capture_output=True).returncode != 0:
+        raise RuntimeError("tmux is not installed. Required for concurrent worktree agents.")
+
+    # Start tmux session
+    subprocess.run(
+        ["tmux", "new-session", "-d", "-s", wt_id, "-c", wt_path],
+        check=True,
+    )
+    # Brief pause to ensure session is ready
+    time.sleep(0.3)
+    subprocess.run(
+        ["tmux", "send-keys", "-t", wt_id,
+         f"bash {shlex.quote(str(launch_script))}", "Enter"],
+        check=True,
+    )
+
+
+def _dequeue(state):
+    """Start the next queued worktree if a slot is available. Mutates state."""
+    active_count = sum(1 for w in state["worktrees"] if w["status"] == "running")
+    if active_count >= MAX_WORKTREES:
+        return
+    for wt in state["worktrees"]:
+        if wt["status"] == "queued":
+            try:
+                launch_worktree(wt)
+                wt["status"] = "running"
+            except Exception as e:
+                wt["status"] = "failed"
+                print(f"ERROR launching queued worktree {wt['id']}: {e}", file=sys.stderr)
+            return
+
+
+# ── commands ───────────────────────────────────────────────────────────────────
+
+def cmd_create(args):
+    repo = git_root(args.repo)
+    if not repo:
+        print(
+            "ERROR: not a git repository. Concurrent execution requires git.\n"
+            "Falling back to sequential execution.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    wt_id = gen_id()
+    task_slug = make_slug(args.task)
+    branch = args.branch or f"feat/{task_slug}"
+
+    # Make branch name unique if it already exists
+    if branch_exists(repo, branch):
+        branch = f"{branch}-{wt_id}"
+
+    wt_path = os.path.join(repo, ".worktrees", wt_id)
+    base_branch = current_branch(repo)
+
+    lock = _acquire_lock()
+    try:
+        state = load_state()
+        active = sum(1 for w in state["worktrees"] if w["status"] in ("running", "queued"))
+        status = "queued" if active >= MAX_WORKTREES else "pending"
+
+        entry = {
+            "id": wt_id,
+            "task": args.task,
+            "slug": task_slug,
+            "branch": branch,
+            "path": wt_path,
+            "repo": repo,
+            "base_branch": base_branch,
+            "agent": args.agent,
+            "tmux_session": wt_id,
+            "status": status,
+            "created_at": now_iso(),
+            "last_output_at": None,
+            "completed_at": None,
+        }
+        state["worktrees"].append(entry)
+
+        if status == "queued":
+            save_state(state)
+            print(f"QUEUED   {wt_id}  (slots full — {MAX_WORKTREES} active. Starts automatically when one completes.)")
+            print(f"  task:   {args.task}")
+            return
+
+        try:
+            launch_worktree(entry)
+            entry["status"] = "running"
+        except Exception as e:
+            entry["status"] = "failed"
+            save_state(state)
+            print(f"ERROR: failed to launch worktree: {e}", file=sys.stderr)
+            sys.exit(1)
+
+        save_state(state)
+    finally:
+        lock.close()
+
+    print(f"STARTED  {wt_id}")
+    print(f"  task:    {args.task}")
+    print(f"  branch:  {branch}")
+    print(f"  session: {wt_id}  →  tmux attach -t {wt_id}")
+    print(f"  log:     {LOGS_DIR}/{wt_id}.log")
+
+
+def cmd_list(args):
+    lock = _acquire_lock()
+    try:
+        state = load_state()
+        stalled = check_and_mark_stalls(state)
+        save_state(state)
+    finally:
+        lock.close()
+
+    if args.json:
+        print(json.dumps(state, indent=2))
+        return
+
+    repo_filter = git_root(args.repo) if args.repo else None
+    wts = [w for w in state["worktrees"] if not repo_filter or w["repo"] == repo_filter]
+
+    if not wts:
+        print("No worktrees.")
+        return
+
+    STATUS_ICON = {
+        "running":      "⟳",
+        "queued":       "…",
+        "pending":      "…",
+        "completed":    "✓",
+        "failed":       "✗",
+        "cancelled":    "⊘",
+        "stalled":      "⚠",
+        "consolidated": "⬆",
+    }
+
+    now = now_ts()
+    rows = []
+    for wt in wts:
+        icon = STATUS_ICON.get(wt["status"], "?")
+        created = datetime.fromisoformat(wt["created_at"]).timestamp()
+        elapsed_s = int(now - created)
+        elapsed = f"{elapsed_s // 60}m{elapsed_s % 60:02d}s"
+        task_preview = (wt["task"][:52] + "…") if len(wt["task"]) > 53 else wt["task"]
+        rows.append((wt["id"], icon, wt["status"], elapsed, wt["branch"], task_preview))
+
+    headers = ["ID", " ", "STATUS", "ELAPSED", "BRANCH", "TASK"]
+    widths = [max(len(str(r[i])) for r in rows + [tuple(headers)]) for i in range(6)]
+
+    def fmt(row):
+        return "  ".join(str(row[i]).ljust(widths[i]) for i in range(6))
+
+    print(fmt(headers))
+    print("─" * (sum(widths) + 10))
+    for row in rows:
+        print(fmt(row))
+
+    if stalled:
+        print(f"\n⚠  STALLED (no output >{STALL_TIMEOUT // 60}min): {', '.join(stalled)}")
+        print("   worktree-manager cancel <id>  or  worktree-manager attach <id>")
+
+
+def cmd_status(args):
+    state = load_state()
+    wt = find_wt(state, args.id)
+    if not wt:
+        print(f"ERROR: {args.id} not found", file=sys.stderr)
+        sys.exit(1)
+
+    print(json.dumps(wt, indent=2))
+
+    log_file = LOGS_DIR / f"{args.id}.log"
+    if log_file.exists():
+        print(f"\n─── last 20 lines of log ({log_file}) ───")
+        subprocess.run(["tail", "-20", str(log_file)])
+
+
+def cmd_attach(args):
+    state = load_state()
+    wt = find_wt(state, args.id)
+    if not wt:
+        print(f"ERROR: {args.id} not found", file=sys.stderr)
+        sys.exit(1)
+
+    if wt["status"] in ("running", "stalled"):
+        r = subprocess.run(["tmux", "has-session", "-t", args.id], capture_output=True)
+        if r.returncode == 0:
+            print(f"Attaching to tmux session '{args.id}'.")
+            print(f"  Detach with: Ctrl-b d")
+            os.execlp("tmux", "tmux", "attach-session", "-t", args.id)
+        else:
+            print(f"tmux session '{args.id}' not found (agent may have exited).")
+            print(f"  Status is '{wt['status']}'. Try: worktree-manager status {args.id}")
+        return
+
+    if wt["status"] in ("completed", "failed"):
+        wt_path = wt["path"]
+        if not os.path.exists(wt_path):
+            print(f"ERROR: worktree path no longer exists: {wt_path}", file=sys.stderr)
+            sys.exit(1)
+        print(f"Worktree {args.id} is '{wt['status']}'. Launching interactive session in worktree dir.")
+        print(f"  Path: {wt_path}")
+        os.chdir(wt_path)
+        os.execlp("claude", "claude")
+
+    print(f"Worktree {args.id} has status '{wt['status']}' — nothing to attach to.")
+
+
+def cmd_cancel(args):
+    lock = _acquire_lock()
+    try:
+        state = load_state()
+        wt = find_wt(state, args.id)
+        if not wt:
+            print(f"ERROR: {args.id} not found", file=sys.stderr)
+            sys.exit(1)
+
+        if wt["status"] in ("running", "stalled"):
+            subprocess.run(["tmux", "kill-session", "-t", args.id], capture_output=True)
+
+        if os.path.exists(wt["path"]):
+            subprocess.run(
+                ["git", "worktree", "remove", "--force", wt["path"]],
+                cwd=wt["repo"], capture_output=True,
+            )
+        # Delete the branch
+        subprocess.run(
+            ["git", "branch", "-D", wt["branch"]],
+            cwd=wt["repo"], capture_output=True,
+        )
+
+        wt["status"] = "cancelled"
+        wt["completed_at"] = now_iso()
+
+        # Start a queued worktree if one is waiting
+        _dequeue(state)
+        save_state(state)
+    finally:
+        lock.close()
+
+    print(f"CANCELLED {args.id}")
+
+
+def cmd_complete(args):
+    """Internal: called by the launcher script when the agent process exits."""
+    lock = _acquire_lock()
+    try:
+        state = load_state()
+        wt = find_wt(state, args.id)
+        if not wt:
+            return
+        wt["status"] = "completed" if args.exit_code == 0 else "failed"
+        wt["completed_at"] = now_iso()
+        _dequeue(state)
+        save_state(state)
+    finally:
+        lock.close()
+
+    result = "COMPLETED" if args.exit_code == 0 else f"FAILED (exit {args.exit_code})"
+    print(f"{result}: {args.id}")
+
+
+def cmd_consolidate(args):
+    state = load_state()
+    wts = [w for w in state["worktrees"] if w["status"] == "completed"]
+
+    if args.ids:
+        id_set = set(args.ids.split(","))
+        wts = [w for w in wts if w["id"] in id_set]
+
+    if not wts:
+        print("No completed worktrees to consolidate.")
+        return
+
+    repos = {w["repo"] for w in wts}
+    if len(repos) > 1:
+        print("ERROR: worktrees span multiple repos — consolidate each repo separately.", file=sys.stderr)
+        sys.exit(1)
+    repo = repos.pop()
+
+    # Determine feature branch name
+    if args.branch:
+        feature_branch = args.branch
+    else:
+        combined_slug = "-".join(w["slug"][:15] for w in wts[:3])
+        feature_branch = f"feat/{combined_slug[:40]}"
+
+    if branch_exists(repo, feature_branch):
+        feature_branch = f"{feature_branch}-{int(time.time())}"
+
+    base = wts[0]["base_branch"]
+    subprocess.run(["git", "checkout", "-b", feature_branch, base], cwd=repo, check=True)
+    print(f"Created feature branch: {feature_branch}  (base: {base})")
+
+    strategy = args.strategy
+    merged = []
+
+    for wt in wts:
+        print(f"\n  merging {wt['id']} ({wt['branch']}) [{strategy}]...")
+
+        if strategy == "squash":
+            r = subprocess.run(
+                ["git", "merge", "--squash", wt["branch"]],
+                cwd=repo, capture_output=True, text=True,
+            )
+            if r.returncode != 0:
+                _consolidation_conflict(wt, feature_branch, r)
+                sys.exit(1)
+            subprocess.run(
+                ["git", "commit", "-m", f"feat({wt['slug']}): {wt['task'][:72]}"],
+                cwd=repo, check=True,
+            )
+
+        elif strategy == "merge":
+            r = subprocess.run(
+                ["git", "merge", "--no-ff", wt["branch"]],
+                cwd=repo, capture_output=True, text=True,
+            )
+            if r.returncode != 0:
+                _consolidation_conflict(wt, feature_branch, r)
+                sys.exit(1)
+
+        elif strategy == "rebase":
+            # Rebase worktree branch onto feature_branch, then fast-forward
+            r = subprocess.run(
+                ["git", "rebase", feature_branch, wt["branch"]],
+                cwd=repo, capture_output=True, text=True,
+            )
+            if r.returncode != 0:
+                subprocess.run(["git", "rebase", "--abort"], cwd=repo, capture_output=True)
+                _consolidation_conflict(wt, feature_branch, r)
+                sys.exit(1)
+            subprocess.run(["git", "checkout", feature_branch], cwd=repo, check=True)
+            subprocess.run(["git", "merge", "--ff-only", wt["branch"]], cwd=repo, check=True)
+
+        print(f"  ✓ {wt['id']}")
+        merged.append(wt["id"])
+
+    # Clean up merged worktrees
+    lock = _acquire_lock()
+    try:
+        state = load_state()
+        for wt_id in merged:
+            wt = find_wt(state, wt_id)
+            if not wt:
+                continue
+            if os.path.exists(wt["path"]):
+                subprocess.run(
+                    ["git", "worktree", "remove", "--force", wt["path"]],
+                    cwd=wt["repo"], capture_output=True,
+                )
+            subprocess.run(
+                ["git", "branch", "-D", wt["branch"]],
+                cwd=wt["repo"], capture_output=True,
+            )
+            wt["status"] = "consolidated"
+        save_state(state)
+    finally:
+        lock.close()
+
+    print(f"\n✓ Consolidated {len(merged)} worktree(s) into {feature_branch}")
+
+
+def _consolidation_conflict(wt, feature_branch, result):
+    print(f"\nCONFLICT merging {wt['id']} ({wt['branch']}) into {feature_branch}")
+    print(f"  stdout: {result.stdout.strip()}")
+    print(f"  stderr: {result.stderr.strip()}")
+    print(f"\nConsolidation paused. Resolve conflicts manually, then:")
+    print(f"  worktree-manager consolidate --ids {wt['id']} --branch {feature_branch}")
+
+
+def cmd_cleanup(args):
+    lock = _acquire_lock()
+    try:
+        state = load_state()
+        removed = []
+        for wt in state["worktrees"]:
+            if wt["status"] not in ("consolidated", "cancelled"):
+                continue
+            if os.path.exists(wt["path"]):
+                subprocess.run(
+                    ["git", "worktree", "remove", "--force", wt["path"]],
+                    cwd=wt["repo"], capture_output=True,
+                )
+            # Remove log and launch script
+            for f in [LOGS_DIR / f"{wt['id']}.log", LOGS_DIR / f"{wt['id']}-launch.sh"]:
+                if f.exists():
+                    f.unlink()
+            removed.append(wt["id"])
+
+        state["worktrees"] = [w for w in state["worktrees"] if w["id"] not in removed]
+        save_state(state)
+    finally:
+        lock.close()
+
+    if removed:
+        print(f"Cleaned up: {', '.join(removed)}")
+    else:
+        print("Nothing to clean up.")
+
+
+# ── main ───────────────────────────────────────────────────────────────────────
+
+def main():
+    parser = argparse.ArgumentParser(
+        prog="worktree-manager",
+        description="Concurrent agent worktree orchestrator",
+    )
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    p = sub.add_parser("create", help="Create a worktree and launch an agent")
+    p.add_argument("task", help="Task description (passed as initial prompt to agent)")
+    p.add_argument("--agent", default="claude", choices=["claude", "cursor", "copilot"],
+                   help="Agent to use (default: claude)")
+    p.add_argument("--repo", default=None, help="Path to git repo (default: cwd)")
+    p.add_argument("--branch", default=None, help="Override branch name (default: feat/<slug>)")
+
+    p = sub.add_parser("list", help="List all worktrees with status")
+    p.add_argument("--json", action="store_true", help="Output raw JSON state")
+    p.add_argument("--repo", default=None, help="Filter to a specific repo")
+
+    p = sub.add_parser("status", help="Show details and tail log for a worktree")
+    p.add_argument("id", help="Worktree ID (e.g. wt-abc123)")
+
+    p = sub.add_parser("attach", help="Attach to a running worktree agent via tmux")
+    p.add_argument("id", help="Worktree ID")
+
+    p = sub.add_parser("cancel", help="Cancel a running or queued worktree")
+    p.add_argument("id", help="Worktree ID")
+
+    p = sub.add_parser("consolidate", help="Merge completed worktrees into a feature branch")
+    p.add_argument("--branch", default=None, help="Feature branch name (default: feat/<combined-slug>)")
+    p.add_argument("--strategy", default="squash", choices=["squash", "merge", "rebase"],
+                   help="Merge strategy (default: squash)")
+    p.add_argument("--ids", default=None, help="Comma-separated worktree IDs (default: all completed)")
+
+    sub.add_parser("cleanup", help="Remove state entries and logs for consolidated/cancelled worktrees")
+
+    # Internal command called by launcher scripts on agent exit
+    p = sub.add_parser("_complete", help=argparse.SUPPRESS)
+    p.add_argument("id")
+    p.add_argument("exit_code", type=int)
+
+    args = parser.parse_args()
+    dispatch = {
+        "create": cmd_create,
+        "list": cmd_list,
+        "status": cmd_status,
+        "attach": cmd_attach,
+        "cancel": cmd_cancel,
+        "consolidate": cmd_consolidate,
+        "cleanup": cmd_cleanup,
+        "_complete": cmd_complete,
+    }
+    dispatch[args.command](args)
+
+
+if __name__ == "__main__":
+    main()

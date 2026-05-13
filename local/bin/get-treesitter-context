@@ -1,0 +1,69 @@
+#!/bin/bash
+#
+# Returns the nearest enclosing function/class scope at a position using Treesitter.
+# Usage: get-treesitter-context [file line col]
+#        No args: uses current buffer and cursor position.
+# Output: JSON {type, name, file, range:{start,finish}} or null if no scope found.
+
+NVIM_SOCKET="${NVIM:-${NVIM_LISTEN_ADDRESS:-}}"
+[[ -z "$NVIM_SOCKET" ]] && { echo "error: no neovim socket found" >&2; exit 1; }
+
+LUA=$(mktemp /tmp/nvim-agent-XXXXXX.lua)
+OUT=$(mktemp)
+trap 'rm -f "$LUA" "$OUT"' EXIT
+
+export NVIM_AGENT_FILE="${1:+$(realpath "$1")}"
+export NVIM_AGENT_LINE="${2:-}"
+export NVIM_AGENT_COL="${3:-}"
+
+cat > "$LUA" << EOF
+local out_path = "$OUT"
+
+local scope_types = {
+  ["function"]=true, function_definition=true, function_declaration=true,
+  method_definition=true, method_declaration=true, arrow_function=true,
+  function_item=true, impl_item=true, class_definition=true,
+  class_declaration=true, class=true, struct_item=true, module=true,
+}
+
+local function find_scope(bufnr, row, col)
+  local ok, node = pcall(vim.treesitter.get_node, {bufnr=bufnr, pos={row, col}})
+  if not ok or not node then return nil end
+  local t = node
+  while t and not scope_types[t:type()] do t = t:parent() end
+  if not t then return nil end
+  local sr, sc, er, ec = t:range()
+  local name_node = t:field("name")[1]
+  local name = name_node and vim.treesitter.get_node_text(name_node, bufnr) or "?"
+  return {type=t:type(), name=name, range={start={line=sr+1,col=sc+1},finish={line=er+1,col=ec+1}}}
+end
+
+local result
+local env_file = os.getenv("NVIM_AGENT_FILE")
+
+if env_file and env_file ~= "" then
+  local bufnr = vim.fn.bufnr(env_file)
+  if bufnr == -1 then
+    result = '{"error":"buffer not loaded, open the file first"}'
+  else
+    local row = tonumber(os.getenv("NVIM_AGENT_LINE") or "1") - 1
+    local col = tonumber(os.getenv("NVIM_AGENT_COL") or "1") - 1
+    local scope = find_scope(bufnr, row, col)
+    result = scope and vim.json.encode(vim.tbl_extend("force", scope, {file=env_file})) or "null"
+  end
+else
+  local bufnr = vim.api.nvim_get_current_buf()
+  local pos = vim.api.nvim_win_get_cursor(0)
+  local fname = vim.api.nvim_buf_get_name(bufnr)
+  local scope = find_scope(bufnr, pos[1]-1, pos[2])
+  result = scope and vim.json.encode(vim.tbl_extend("force", scope, {file=fname})) or "null"
+end
+
+local f = io.open(out_path, "w")
+f:write(result)
+f:close()
+EOF
+
+nvim --server "$NVIM_SOCKET" --remote-expr "execute('luafile $LUA')" > /dev/null 2>&1
+
+[[ -s "$OUT" ]] && cat "$OUT" || echo "null"

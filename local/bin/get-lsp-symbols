@@ -1,0 +1,70 @@
+#!/bin/bash
+#
+# Returns all LSP document symbols (functions, classes, variables, etc.) for a file.
+# Usage: get-lsp-symbols <file>
+# Output: JSON {file, symbols:[{name, kind, line, col, depth}]}
+#
+# The file must be open as a Neovim buffer with an active LSP client.
+# Nested symbols (methods inside classes) are flattened with a depth field.
+
+FILE="$1"
+[[ -z "$FILE" ]] && { echo "usage: get-lsp-symbols <file>" >&2; exit 1; }
+[[ ! -f "$FILE" ]] && { echo "error: '$FILE' not found" >&2; exit 1; }
+
+NVIM_SOCKET="${NVIM:-${NVIM_LISTEN_ADDRESS:-}}"
+[[ -z "$NVIM_SOCKET" ]] && { echo "error: no neovim socket found" >&2; exit 1; }
+
+LUA=$(mktemp /tmp/nvim-agent-XXXXXX.lua)
+OUT=$(mktemp)
+trap 'rm -f "$LUA" "$OUT"' EXIT
+
+export NVIM_AGENT_FILE="$(realpath "$FILE")"
+export NVIM_AGENT_OUT="$OUT"
+
+cat > "$LUA" << 'LUAEOF'
+local out_path = os.getenv("NVIM_AGENT_OUT")
+local fname    = os.getenv("NVIM_AGENT_FILE")
+
+local function write(s) local f=io.open(out_path,"w"); f:write(s); f:close() end
+
+local bufnr = vim.fn.bufnr(fname)
+if bufnr == -1 then write('{"error":"buffer not loaded"}'); return end
+
+local kind_names = {
+  "File","Module","Namespace","Package","Class","Method","Property","Field",
+  "Constructor","Enum","Interface","Function","Variable","Constant","String",
+  "Number","Boolean","Array","Object","Key","Null","EnumMember","Struct",
+  "Event","Operator","TypeParameter",
+}
+
+local symbols = {}
+local function flatten(syms, depth)
+  for _, s in ipairs(syms or {}) do
+    local range = s.range or (s.location and s.location.range) or {}
+    local start = range.start or {}
+    table.insert(symbols, {
+      name  = s.name,
+      kind  = kind_names[s.kind] or tostring(s.kind),
+      line  = (start.line or 0) + 1,
+      col   = (start.character or 0) + 1,
+      depth = depth,
+    })
+    if s.children then flatten(s.children, depth+1) end
+  end
+end
+
+local params  = {textDocument = {uri = vim.uri_from_fname(fname)}}
+local results, err = vim.lsp.buf_request_sync(bufnr, "textDocument/documentSymbol", params, 3000)
+
+if not err and results then
+  for _, res in pairs(results) do
+    if res.result then flatten(res.result, 0) end
+  end
+end
+
+write(vim.json.encode({file=fname, symbols=symbols}))
+LUAEOF
+
+nvim --server "$NVIM_SOCKET" --remote-expr "execute('luafile $LUA')" > /dev/null 2>&1
+
+[[ -s "$OUT" ]] && cat "$OUT" || echo '{"file":"","symbols":[]}'

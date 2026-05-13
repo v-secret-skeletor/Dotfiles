@@ -1,0 +1,18 @@
+#!/bin/bash
+#
+# Reads the current Neovim quickfix list.
+# Usage: get-quickfix-list
+# Output: JSON {title, items:[{file, lnum, col, type, text}]}
+#
+# The quickfix list holds LSP errors, compiler output, grep results, test failures, etc.
+
+NVIM_SOCKET="${NVIM:-${NVIM_LISTEN_ADDRESS:-}}"
+[[ -z "$NVIM_SOCKET" ]] && { echo "error: no neovim socket found" >&2; exit 1; }
+
+TMP=$(mktemp)
+trap 'rm -f "$TMP"' EXIT
+
+nvim --server "$NVIM_SOCKET" --remote-expr \
+  "luaeval('local f=io.open([[${TMP}]],[[w]]); local qf=vim.fn.getqflist({all=1}); local items={}; for _,v in ipairs(qf.items or {}) do local n=[[]]; if v.bufnr and v.bufnr>0 then n=vim.api.nvim_buf_get_name(v.bufnr) end; table.insert(items,{file=n,lnum=v.lnum,col=v.col,type=v.type,text=v.text}) end; f:write(vim.json.encode({title=qf.title or [[]],items=items})); f:close(); return 1')" > /dev/null 2>&1
+
+[[ -s "$TMP" ]] && cat "$TMP" || echo '{"title":"","items":[]}'

@@ -1,0 +1,71 @@
+#!/bin/bash
+#
+# Returns LSP hover documentation for a symbol at a given position.
+# Usage: get-lsp-hover <file> <line> <col>
+# Output: JSON {content, file, line, col} or null if no hover info available.
+#
+# The file must be open as a Neovim buffer with an active LSP client.
+
+FILE="$1"; LINE="$2"; COL="$3"
+[[ -z "$FILE" || -z "$LINE" || -z "$COL" ]] && {
+  echo "usage: get-lsp-hover <file> <line> <col>" >&2; exit 1
+}
+[[ ! -f "$FILE" ]] && { echo "error: '$FILE' not found" >&2; exit 1; }
+
+NVIM_SOCKET="${NVIM:-${NVIM_LISTEN_ADDRESS:-}}"
+[[ -z "$NVIM_SOCKET" ]] && { echo "error: no neovim socket found" >&2; exit 1; }
+
+LUA=$(mktemp /tmp/nvim-agent-XXXXXX.lua)
+OUT=$(mktemp)
+trap 'rm -f "$LUA" "$OUT"' EXIT
+
+ABS_FILE="$(realpath "$FILE")"
+export NVIM_AGENT_FILE="$ABS_FILE"
+export NVIM_AGENT_LINE="$LINE"
+export NVIM_AGENT_COL="$COL"
+
+cat > "$LUA" << 'LUAEOF'
+local out_path = os.getenv("NVIM_AGENT_OUT")
+local fname    = os.getenv("NVIM_AGENT_FILE")
+local line     = tonumber(os.getenv("NVIM_AGENT_LINE")) - 1
+local char     = tonumber(os.getenv("NVIM_AGENT_COL"))  - 1
+
+local function write(s) local f=io.open(out_path,"w"); f:write(s); f:close() end
+
+local bufnr = vim.fn.bufnr(fname)
+if bufnr == -1 then write('{"error":"buffer not loaded"}'); return end
+
+local params = {
+  textDocument = {uri = vim.uri_from_fname(fname)},
+  position     = {line = line, character = char},
+}
+
+local results, err = vim.lsp.buf_request_sync(bufnr, "textDocument/hover", params, 2000)
+if err or not results or vim.tbl_isempty(results) then write("null"); return end
+
+local function extract(contents)
+  if type(contents) == "string" then return contents end
+  if contents.value then return contents.value end
+  local parts = {}
+  for _, item in ipairs(contents) do
+    table.insert(parts, type(item)=="string" and item or (item.value or ""))
+  end
+  return table.concat(parts, "\n")
+end
+
+for _, res in pairs(results) do
+  if res.result and res.result.contents then
+    write(vim.json.encode({
+      content = extract(res.result.contents),
+      file = fname, line = line+1, col = char+1,
+    }))
+    return
+  end
+end
+write("null")
+LUAEOF
+
+export NVIM_AGENT_OUT="$OUT"
+nvim --server "$NVIM_SOCKET" --remote-expr "execute('luafile $LUA')" > /dev/null 2>&1
+
+[[ -s "$OUT" ]] && cat "$OUT" || echo "null"

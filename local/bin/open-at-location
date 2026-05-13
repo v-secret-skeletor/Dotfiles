@@ -1,0 +1,23 @@
+#!/bin/bash
+#
+# Opens a file in Neovim and jumps to a specific line and column.
+# Usage: open-at-location <file> <line> [col]
+#
+# Requires $NVIM to be set (automatic inside neovim's :terminal).
+
+FILE="$1"
+LINE="${2:-1}"
+COL="${3:-1}"
+
+[[ -z "$FILE" ]] && { echo "usage: open-at-location <file> <line> [col]" >&2; exit 1; }
+[[ ! -f "$FILE" ]] && { echo "error: '$FILE' not found" >&2; exit 1; }
+
+NVIM_SOCKET="${NVIM:-${NVIM_LISTEN_ADDRESS:-}}"
+[[ -z "$NVIM_SOCKET" ]] && exit 0
+
+ABS_FILE="$(realpath "$FILE")"
+
+NVIM_AGENT_FILE="$ABS_FILE" nvim --server "$NVIM_SOCKET" --remote-expr \
+  "luaeval('local f=os.getenv([[NVIM_AGENT_FILE]]); vim.cmd([[edit ]]..vim.fn.fnameescape(f)); vim.api.nvim_win_set_cursor(0,{${LINE},${COL}-1}); return 1')" > /dev/null 2>&1
+
+nvim --server "$NVIM_SOCKET" --remote-expr "execute('set autoread | checktime')" > /dev/null 2>&1
