@@ -325,13 +325,6 @@ mkdir -p "$HOME/.copilot"
 cp -r "$DOTFILES_DIR/copilot/." "$HOME/.copilot/"
 log "  copilot → ~/.copilot"
 
-# Agent skills
-if [ -L "$HOME/.agent-skills" ] || [ -d "$HOME/.agent-skills" ]; then
-  rm -rf "$HOME/.agent-skills"
-fi
-cp -r "$DOTFILES_DIR/agent-skills" "$HOME/.agent-skills"
-log "  agent-skills → ~/.agent-skills"
-
 # Local bin scripts
 mkdir -p "$HOME/.local/bin"
 cp "$DOTFILES_DIR/local/bin/"* "$HOME/.local/bin/"
