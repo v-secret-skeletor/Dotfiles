@@ -123,8 +123,7 @@ install_yazi() {
     return
   fi
 
-  local yazi_version="26.1.22"
-  log "Installing yazi v${yazi_version} (building from git — crates.io builds require yazi-build wrapper)..."
+  log "Installing yazi..."
 
   # Install Rust toolchain if not present
   if ! command -v cargo &>/dev/null; then
@@ -134,17 +133,12 @@ install_yazi() {
     source "$HOME/.cargo/env"
   fi
 
-  local tmp
-  tmp="$(mktemp -d)"
-  git clone --depth 1 --branch "v${yazi_version}" https://github.com/sxyazi/yazi.git "$tmp/yazi"
-  cargo install --locked --force --path "$tmp/yazi/yazi-fm"
-  cargo install --locked --force --path "$tmp/yazi/yazi-cli"
-  rm -rf "$tmp"
+  cargo install --locked yazi-fm yazi-cli
 
   # Place binaries on the system PATH so they're available without cargo env
   sudo install "$HOME/.cargo/bin/yazi" /usr/local/bin/yazi
   sudo install "$HOME/.cargo/bin/ya" /usr/local/bin/ya
-  log "yazi v${yazi_version} installed."
+  log "yazi installed."
 }
 safe_install "yazi" install_yazi
 
@@ -255,24 +249,17 @@ install_tree_sitter() {
     return
   fi
 
-  log "Installing tree-sitter CLI..."
+  log "Installing tree-sitter CLI from GitHub releases..."
 
-  # Ensure Rust toolchain is available (installed during yazi step)
-  if ! command -v cargo &>/dev/null; then
-    if [ -f "$HOME/.cargo/env" ]; then
-      # shellcheck source=/dev/null
-      source "$HOME/.cargo/env"
-    else
-      log "Installing Rust toolchain..."
-      curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --quiet
-      # shellcheck source=/dev/null
-      source "$HOME/.cargo/env"
-    fi
-  fi
+  local tmp
+  tmp="$(mktemp -d)"
+  local url="https://github.com/tree-sitter/tree-sitter/releases/latest/download/tree-sitter-cli-linux-x86.zip"
+  curl -fsSL "$url" -o "$tmp/tree-sitter-cli.zip"
+  unzip -q "$tmp/tree-sitter-cli.zip" -d "$tmp"
+  chmod +x "$tmp/tree-sitter"
+  sudo install "$tmp/tree-sitter" /usr/local/bin/tree-sitter
+  rm -rf "$tmp"
 
-  cargo install tree-sitter-cli
-
-  sudo install "$HOME/.cargo/bin/tree-sitter" /usr/local/bin/tree-sitter
   log "tree-sitter CLI $(tree-sitter --version) installed."
 }
 safe_install "tree-sitter" install_tree_sitter
